@@ -9,6 +9,7 @@ export interface IPlayers extends Document {
   role: PlayerRole;
   tags: Tag;
   teamId: mongoose.Schema.Types.ObjectId;
+  createdBy: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,6 +33,11 @@ const playerSchema = new mongoose.Schema<IPlayers>(
     teamId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Team",
+      required: true,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       required: true,
     },
   },

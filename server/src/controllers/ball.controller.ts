@@ -40,9 +40,10 @@ export const addBall = async(req: Request, res:Response) =>{
         inning.totalRuns += runsScored + extraRuns;
 
 
+        
 
     } catch (error) {
-        res.status(400).json({ message : "server error", error})
+        res.status(400).json({ message : "server error", error});
     }
 }
 

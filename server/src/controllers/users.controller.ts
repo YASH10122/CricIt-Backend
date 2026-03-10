@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import User from "../model/users.model";
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import Match from '../model/match.model';
+// import Match from '../model/match.model';
 
 export const registercontroller = async (req : Request, res : Response) => {
     try {
@@ -30,7 +30,7 @@ export const registercontroller = async (req : Request, res : Response) => {
         await user.save();
 
             const token = jwt.sign({id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: '2d' });
-    res.status(201).json({ message: 'User registered successfully......' });
+    res.status(200).json({ message: 'User registered successfully......' });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error });
     }
