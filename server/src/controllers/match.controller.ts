@@ -222,4 +222,15 @@ export const getAllMatch = async(req: AuthRequest, res: Response) => {
   }
 }
 
+// for home page live match
+export const getLiveMatches = async (req: Request, res: Response) => {
+  try {
+    const matches = await Match.find({ status: "live" })
+      .populate("teamA", "teamname")
+      .populate("teamB", "teamname");
 
+    res.status(200).json(matches);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};

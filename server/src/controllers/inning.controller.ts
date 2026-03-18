@@ -185,3 +185,25 @@ export const getInningById = async (req: Request, res: Response) => {
   }
 };
 
+
+export const changeBowler = async (req : Request, res : Response) => {
+  try {
+    const { inningId } = req.params;
+    const { bowlerId } = req.body;
+    
+    const inning = await Inning.findById(inningId);
+     if (!inning) return res.status(404).json({ message: "Inning not found" });
+
+
+    inning.previousBowler = inning.currentBowler;
+    inning.currentBowler = bowlerId; 
+
+    await inning.save();
+
+    res.json({ message: "Bowler Changed", inning });
+  } catch (error) {
+     res.status(500).json({ message: "Server error", error });
+  }
+}
+
+

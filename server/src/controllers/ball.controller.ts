@@ -15,7 +15,7 @@ export const addBall = async (req: Request, res: Response) => {
       wicketType,
       outPlayer,
       newBatsman,
-      bowler
+      bowler,
     } = req.body;
 
     const match = await Match.findById(matchId);
@@ -48,7 +48,7 @@ export const addBall = async (req: Request, res: Response) => {
       isLegalDelivery,
       isWicket,
       wicketType,
-      outPlayer
+      outPlayer,
     });
 
     //  runs
@@ -58,10 +58,7 @@ export const addBall = async (req: Request, res: Response) => {
     if (isWicket) {
       inning.totalWickets++;
 
-      if (inning.totalWickets < match.playingTeamA.length) {
-        if (!newBatsman)
-          return res.status(400).json({ message: "enning end" });
-
+      if (newBatsman) {
         if (outPlayer.toString() === inning.striker.toString()) {
           inning.striker = newBatsman;
         } else {
@@ -70,13 +67,6 @@ export const addBall = async (req: Request, res: Response) => {
       }
     }
 
-    if(isWicket){
-   inning.totalWickets++
-
-   if(newBatsman){
-      inning.striker = newBatsman
-   }
-}
     // ball count
     if (isLegalDelivery) {
       inning.ballsInCurrentOver++;
@@ -100,18 +90,27 @@ export const addBall = async (req: Request, res: Response) => {
     }
 
     //all Out
-    if (inning.totalWickets === match.playingTeamA.length) {
+    // if (inning.totalWickets === match.playingTeamA.length) {
+    //   inning.status = "completed";
+    //   inning.resultType = "all-out";
+    // }
+
+    const battingTeamSize = inning.battingTeam.equals(match.teamA)
+      ? match.playingTeamA.length
+      : match.playingTeamB.length;
+
+    if (inning.totalWickets >= battingTeamSize - 1) {
       inning.status = "completed";
       inning.resultType = "all-out";
     }
 
-// Over finish
+    // Over finish
     if (inning.oversCompleted === match.totalOverInMatch) {
       inning.status = "completed";
       inning.resultType = "overs-completed";
     }
 
-    // target chase 
+    // target chase
     if (inning.inningNumber === 2 && inning.totalRuns >= (inning.target || 0)) {
       inning.status = "completed";
       inning.resultType = "chased";
@@ -123,23 +122,22 @@ export const addBall = async (req: Request, res: Response) => {
 
     res.status(201).json({
       message: "Ball added",
-      inning
+      inning,
     });
   } catch (error) {
     res.status(500).json({ message: "Server error", error });
   }
 };
 
-
 export const undoLastBall = async (req: Request, res: Response) => {
   try {
     const { inningId } = req.params;
 
-    const lastBall = await Ball.findOne({ inningsId: inningId })
-      .sort({ createdAt: -1 });
+    const lastBall = await Ball.findOne({ inningsId: inningId }).sort({
+      createdAt: -1,
+    });
 
-    if (!lastBall)
-      return res.status(404).json({ message: "No ball to undo" });
+    if (!lastBall) return res.status(404).json({ message: "No ball to undo" });
 
     const inning = await Inning.findById(inningId);
     if (!inning) return res.status(404).json({ message: "Inning not found" });
@@ -166,31 +164,31 @@ export const undoLastBall = async (req: Request, res: Response) => {
   }
 };
 
-
 export const getCurrentScore = async (req: Request, res: Response) => {
   const inning = await Inning.findById(req.params.inningId);
 
   res.json({
     runs: inning?.totalRuns,
     wickets: inning?.totalWickets,
-    overs: `${inning?.oversCompleted}.${inning?.ballsInCurrentOver}`
+    overs: `${inning?.oversCompleted}.${inning?.ballsInCurrentOver}`,
   });
 };
 
 export const getBallsByOver = async (req: Request, res: Response) => {
-  const balls = await Ball.find({ inningsId: req.params.inningId })
-    .sort({ overNumber: 1, ballNumber: 1 });
+  const balls = await Ball.find({ inningsId: req.params.inningId }).sort({
+    overNumber: 1,
+    ballNumber: 1,
+  });
 
   res.json(balls);
 };
-
 
 export const getCommentary = async (req: Request, res: Response) => {
   const balls = await Ball.find({ inningsId: req.params.inningId })
     .sort({ createdAt: -1 })
     .populate("batsman bowler");
 
-  const commentary = balls.map(b => {
+  const commentary = balls.map((b) => {
     let result = "";
 
     if (b.isWicket) result = "WICKET";
@@ -204,9 +202,6 @@ export const getCommentary = async (req: Request, res: Response) => {
 
   res.json(commentary);
 };
-
-
-
 
 export const changeBowler = async (req: Request, res: Response) => {
   try {
@@ -226,30 +221,6 @@ export const changeBowler = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // import Match, { MatchStatus } from "../model/match.model";
 // import Inning from "../model/inning.model";
