@@ -96,20 +96,20 @@ const InningsSchema = new Schema<IInnings>(
     striker: {
       type: Schema.Types.ObjectId,
       ref: "Player",
-      required: true,
+      // required: true,
     },
 
     nonStriker: {
       type: Schema.Types.ObjectId,
       ref: "Player",
-      required: true,
+      // required: true,
     },
 
     
     currentBowler: {
       type: Schema.Types.ObjectId,
       ref: "Player",
-      required: true,
+      // required: true,
     },
 
     previousBowler: {

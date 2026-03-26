@@ -1,17 +1,12 @@
 import Match, { MatchStatus, TossDecision } from "../model/match.model";
 import Inning from "../model/inning.model";
 import { Request, Response } from "express";
+import { match } from "node:assert/strict";
 
-
-
-export const  startInning = async (req: Request, res: Response) => {
+export const startInning = async (req: Request, res: Response) => {
   try {
     const { matchId } = req.params;
-    const {
-      striker,
-      nonStriker,
-      currentBowler,
-    } = req.body;
+    const { striker, nonStriker, currentBowler } = req.body;
 
     const match = await Match.findById(matchId);
     if (!match) return res.status(404).json({ message: "match not found..." });
@@ -25,8 +20,6 @@ export const  startInning = async (req: Request, res: Response) => {
       });
     }
 
-
-
     const innings = await Inning.find({ matchId }).sort({
       inningNumber: 1,
     });
@@ -34,9 +27,6 @@ export const  startInning = async (req: Request, res: Response) => {
     let inningNumber: number;
     let battingTeam: any;
     let bowlingTeam: any;
-
-   
-
 
     // FIRST INNING
     if (innings.length === 0) {
@@ -54,23 +44,19 @@ export const  startInning = async (req: Request, res: Response) => {
         battingTeam = opponent;
         bowlingTeam = match.tossWinner;
       }
-    }
-
-
-    else if(innings.length === 1) {
+    } else if (innings.length === 1) {
       const firstInning = innings[0];
 
-      if(firstInning.status !== "completed") {
+      if (firstInning.status !== "completed") {
         return res.status(400).json({
-          message : "First inning not compleat",
+          message: "First inning not compleat",
         });
       }
 
       inningNumber = 2;
       battingTeam = firstInning.bowlingTeam;
       bowlingTeam = firstInning.battingTeam;
-    }
-    else {
+    } else {
       return res.status(400).json({
         message: "Both innings already completed",
       });
@@ -81,7 +67,6 @@ export const  startInning = async (req: Request, res: Response) => {
         message: "Opening batsmen and bowler required",
       });
     }
-
 
     const inning = await new Inning({
       matchId,
@@ -101,9 +86,9 @@ export const  startInning = async (req: Request, res: Response) => {
     await inning.save();
 
     match.status = MatchStatus.LIVE;
-     await match.save();
+    await match.save();
 
-   return res.status(201).json({
+    return res.status(201).json({
       message: `Inning ${inningNumber} started`,
       inning,
     });
@@ -111,7 +96,6 @@ export const  startInning = async (req: Request, res: Response) => {
     res.status(400).json({ message: "server error", error });
   }
 };
-
 
 export const updatScore = async (req: Request, res: Response) => {
   try {
@@ -193,27 +177,24 @@ export const getInningById = async (req: Request, res: Response) => {
   }
 };
 
-
-export const changeBowler = async (req : Request, res : Response) => {
+export const changeBowler = async (req: Request, res: Response) => {
   try {
     const { inningId } = req.params;
     const { bowlerId } = req.body;
-    
-    const inning = await Inning.findById(inningId);
-     if (!inning) return res.status(404).json({ message: "Inning not found" });
 
+    const inning = await Inning.findById(inningId);
+    if (!inning) return res.status(404).json({ message: "Inning not found" });
 
     inning.previousBowler = inning.currentBowler;
-    inning.currentBowler = bowlerId; 
+    inning.currentBowler = bowlerId;
 
     await inning.save();
 
     res.json({ message: "Bowler Changed", inning });
   } catch (error) {
-     res.status(500).json({ message: "Server error", error });
+    res.status(500).json({ message: "Server error", error });
   }
-}
-
+};
 
 export const getInningsByMatchId = async (req: Request, res: Response) => {
   try {
@@ -223,9 +204,86 @@ export const getInningsByMatchId = async (req: Request, res: Response) => {
 
     res.status(200).json(innings);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error });
+    res.status(500).json({ message: "Server error", error });
   }
 };
 
 
-// in a start inning problem is all time in striker and not striker select option player all time teamA come and in opening bowler option always TeamB player come not follow batting team and bowling team player. see in screenshort after toss in db i store tosswinner and decision so on that in startinnig page set batting team player on striker and non striker and bowling team player on opening bowler. see what is issue and give me soluction 
+export const startSecondInning = async (req: Request, res: Response) => {
+  try {
+    const { matchId } = req.params;
+
+    const firstInning = await Inning.findOne({
+      matchId,
+      inningNumber: 1,
+    });
+
+    if (!firstInning || firstInning.status !== "completed") {
+      return res.status(400).json({ message: "First inning not completed" });
+    }
+
+    const exist = await Inning.findOne({
+      matchId,
+      inningNumber: 2,
+    });
+
+    if (exist) {
+      return res.status(400).json({ message: "Second inning already started" });
+    }
+
+    const match = await Match.findById(matchId);
+
+    let battingTeam;
+    let bowlingTeam;
+
+    if (firstInning.battingTeam.equals(match!.teamA)) {
+      battingTeam = match!.teamB;
+      bowlingTeam = match!.teamA;
+    } else {
+      battingTeam = match!.teamA;
+      bowlingTeam = match!.teamB;
+    }
+
+    const inning = await Inning.create({
+      matchId,
+      inningNumber: 2,
+      battingTeam,
+      bowlingTeam,
+      totalRuns: 0,
+      totalWickets: 0,
+      oversCompleted: 0,
+      ballsInCurrentOver: 0,
+      target: firstInning.totalRuns + 1,
+      status: "ongoing",
+    });
+
+    res.status(201).json({ inning });
+
+  } catch (err) {
+    res.status(500).json({ message: "Server error", err });
+  }
+};
+
+
+export const setOpeningPlayers = async (req: Request, res: Response) => {
+  try {
+    const { inningId } = req.params;
+    const { striker, nonStriker, currentBowler } = req.body;
+
+    const inning = await Inning.findById(inningId);
+    if (!inning) {
+      return res.status(404).json({ message: "Inning not found" });
+    }
+
+    inning.striker = striker;
+    inning.nonStriker = nonStriker;
+    inning.currentBowler = currentBowler;
+
+    await inning.save();
+
+    res.status(200).json({ inning });
+
+  } catch (err) {
+    res.status(500).json({ message: "Server error", err });
+  }
+};

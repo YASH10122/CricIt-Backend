@@ -113,47 +113,7 @@ export const matchToss = async (req: Request, res: Response) => {
   }
 };
 
-export const startMatch = async (req: Request, res: Response) => {
-  try {
-    const { matchId } = req.params;
 
-    const match = await Match.findById(matchId);
-
-    if (!match)
-      return res.status(404).json({ message: "match is not created...." });
-
-    if (match.status !== MatchStatus.TOSS)
-      return res
-        .status(404)
-        .json({ message: "before match starttt do toss..." });
-
-    if (!match.tossWinner)
-      return res.status(404).json({ message: "tosswinner not declaree..." });
-
-    let battingTeam, bowlingTeam;
-
-    if (match.tossDecision == "bat") {
-      battingTeam = match.tossWinner;
-    } else {
-      bowlingTeam = match.tossWinner;
-    }
-
-    const inning = await new Inning({
-      matchId,
-      inningsNumber: 1,
-      battingTeam: battingTeam,
-      bowlingTeam: bowlingTeam,
-    });
-
-    match.status = MatchStatus.LIVE;
-
-    await match.save();
-
-    res.json({ message: "match start..", match });
-  } catch (er) {
-    res.status(500).json({ message: "Server error", er });
-  }
-};
 
 export const finishMatch = async (req: Request, res: Response) => {
   try {

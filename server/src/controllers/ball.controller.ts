@@ -111,10 +111,22 @@ export const addBall = async (req: Request, res: Response) => {
     }
 
     // target chase
-    if (inning.inningNumber === 2 && inning.totalRuns >= (inning.target || 0)) {
-      inning.status = "completed";
-      inning.resultType = "chased";
-      match.status = MatchStatus.FINISHED;
+    // if (inning.inningNumber === 2 && inning.totalRuns >= (inning.target || 0)) {
+    //   inning.status = "completed";
+    //   inning.resultType = "chased";
+    //   match.status = MatchStatus.FINISHED;
+    // }
+
+    if (inning.inningNumber === 2) {
+      if (inning.totalRuns >= (inning.target || 0)) {
+        inning.status = "completed";
+
+        await inning.save();
+
+        await Match.findByIdAndUpdate(inning.matchId, {
+          status: "completed",
+        });
+      }
     }
 
     await inning.save();
@@ -187,8 +199,6 @@ export const getCommentary = async (req: Request, res: Response) => {
   const balls = await Ball.find({ inningsId: req.params.inningId })
     .sort({ createdAt: -1 })
     .populate("batsman bowler");
-
-  
 
   const commentary = balls.map((b) => {
     let result = "";

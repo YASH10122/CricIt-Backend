@@ -67,7 +67,7 @@ export enum MatchType {
   T20 = "t20",
   ODI = "odi",
   BOX = "box-cricket",
-  Simple = "simple",
+  Gully = "gully-cricket",
 }
 
 export enum TossDecision {
