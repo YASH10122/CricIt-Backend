@@ -214,7 +214,7 @@ export const EndMatch = async (req: Request, res: Response) => {
         bowlingTeam: firstInning.bowlingTeam,
         runs: firstInning.totalRuns,
         wickets: firstInning.totalWickets,
-        overs: formatOvers(firstInning.oversCompleted, firstInning.ballsInCurrentOver), // ✅ Format overs
+        overs: formatOvers(firstInning.oversCompleted, firstInning.ballsInCurrentOver), 
       },
       secondInning: {
         inningNumber: 2,
