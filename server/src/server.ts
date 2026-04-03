@@ -28,5 +28,5 @@ app.use('/api/ball', ballRoutes);
 const PORT = process.env.PORT || 7000
 
 app.listen(PORT, () => {
-    console.log(`Server is running as lkjfnd jkefhdiwudlwije on port ${PORT}`)
+    console.log(`Server is running as on port ${PORT}`)
 });
