@@ -40,6 +40,7 @@ export const registercontroller = async (req: Request, res: Response) => {
     );
     res.status(200).json({ message: "User registered successfully......" });
   } catch (error) {
+    console.error("REGISTER ERROR:", error);
     res.status(500).json({ message: "Server error", error });
   }
 };
