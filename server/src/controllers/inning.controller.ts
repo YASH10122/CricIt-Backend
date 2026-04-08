@@ -204,7 +204,10 @@ export const getInningsByMatchId = async (req: Request, res: Response) => {
   try {
     const { matchId } = req.params;
 
-    const innings = await Inning.find({ matchId });
+    const innings = await Inning.find({ matchId })
+      .populate("striker", "playername")
+      .populate("nonStriker", "playername")
+      .populate("currentBowler", "playername");
 
     res.status(200).json(innings);
   } catch (error) {
