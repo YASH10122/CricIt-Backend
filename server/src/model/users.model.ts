@@ -4,7 +4,7 @@ export interface IUser extends Document {
   username: string;
   age: number;
   email: string;
-  phone: number;
+  phone: string ;
   password: string;
   city : string;
 }
@@ -14,7 +14,7 @@ const userSchema = new mongoose.Schema<IUser>({
   age: { type: Number, required: true },
   email: { type: String, required: true, unique: true },
   phone: {
-    type: Number,
+    type: String,
     required: true,
     unique: true,
   },
