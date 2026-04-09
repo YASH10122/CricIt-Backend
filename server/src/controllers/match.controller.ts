@@ -119,9 +119,6 @@ export const matchToss = async (req: Request, res: Response) => {
 };
 
 
-
-
-
 export const EndMatch = async (req: Request, res: Response) => {
   try {
     const { matchId } = req.params;
@@ -243,8 +240,6 @@ export const EndMatch = async (req: Request, res: Response) => {
 
 
 
-
-
 export const getAllMatch = async (req: Request, res: Response) => {
   try {
     const matches = await Match.find()
@@ -324,9 +319,6 @@ export const getLiveMatches = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Server error", error });
   }
 };
-
-
-
 
 export const createMatchHistory = async (match: any) => {
   const allPlayers = [...match.playingTeamA, ...match.playingTeamB];
