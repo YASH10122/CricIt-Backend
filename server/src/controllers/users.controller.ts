@@ -34,7 +34,7 @@ export const registercontroller = async (req: Request, res: Response) => {
     await user.save();
 
     const token = jwt.sign(
-      { id: user._id },
+      { id: user._id, role: user.role  },
       process.env.JWT_SECRET || "secret",
       { expiresIn: "2d" },
     );
@@ -63,7 +63,7 @@ export const logincontroller = async (req: Request, res: Response) => {
     }
 
     const token = jwt.sign(
-      { id: user._id },
+      { id: user._id, role: user.role },
       process.env.JWT_SECRET || "secret",
       { expiresIn: "1d" },
     );

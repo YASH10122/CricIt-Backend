@@ -333,3 +333,43 @@ export const createMatchHistory = async (match: any) => {
 
   await PlayerHistory.insertMany(bulk);
 };
+
+export const getMyMatches = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    const matches = await Match.find({ createdBy: userId })
+      .populate("teamA", "teamname")
+      .populate("teamB", "teamname")
+      .sort({ createdAt: -1 });
+
+      // console.log("USER ID:", userId);
+      
+    res.status(200).json(matches);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+export const deleteMatch = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    const match = await Match.findById(id);
+
+    if (!match) {
+      return res.status(404).json({ message: "Match not found" });
+    }
+
+    if (match.createdBy.toString() !== userId) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    await Match.findByIdAndDelete(id);
+
+    res.status(200).json({ message: "Match deleted" });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};
