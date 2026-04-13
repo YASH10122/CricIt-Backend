@@ -70,7 +70,7 @@ export const updatePlayer = async (req : Request, res: Response) => {
         const player = await Players.findByIdAndUpdate(
             id,
             {playername, role, tags, teamId },
-            {new: true, runValidators: true}
+            { returnDocument: "after", runValidators: true }
         );
 
         if(!player){
