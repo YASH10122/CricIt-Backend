@@ -64,9 +64,9 @@ export const addBall = async (req: Request, res: Response) => {
 
     const currentBowler = bowler || inning.currentBowler;
 
-    // 🔥 Parallel PlayerHistory updates
+    //  Parallel PlayerHistory updates
     const updates = [
-      // 🟢 Batsman
+      //  Batsman
       PlayerHistory.findOneAndUpdate(
         { playerId: inning.striker, matchId },
         {
@@ -80,7 +80,7 @@ export const addBall = async (req: Request, res: Response) => {
         { upsert: true }
       ),
 
-      // 🔵 Bowler
+      //  Bowler
       PlayerHistory.findOneAndUpdate(
         { playerId: currentBowler, matchId },
         {
@@ -94,7 +94,7 @@ export const addBall = async (req: Request, res: Response) => {
       ),
     ];
 
-    // 🔴 Wicket update
+    //  Wicket update
     if (isWicket && outPlayer) {
       updates.push(
         PlayerHistory.findOneAndUpdate(
@@ -107,7 +107,7 @@ export const addBall = async (req: Request, res: Response) => {
       );
     }
 
-    // 🟡 Over complete update
+    //  Over complete update
     if (isLegalDelivery && inning.ballsInCurrentOver === 5) {
       updates.push(
         PlayerHistory.findOneAndUpdate(
@@ -119,7 +119,7 @@ export const addBall = async (req: Request, res: Response) => {
 
     await Promise.all(updates);
 
-    // 🔹 Update inning stats
+    //  Update inning stats
     inning.totalRuns += runsScored + extraRuns;
 
     if (isWicket) {
@@ -134,7 +134,7 @@ export const addBall = async (req: Request, res: Response) => {
       }
     }
 
-    // 🔹 Ball count
+    //  Ball count
     if (isLegalDelivery) {
       inning.ballsInCurrentOver++;
 
@@ -150,7 +150,7 @@ export const addBall = async (req: Request, res: Response) => {
       }
     }
 
-    // 🔹 Strike rotate
+    //  Strike rotate
     if (runsScored % 2 === 1) {
       [inning.striker, inning.nonStriker] = [
         inning.nonStriker,
@@ -158,7 +158,7 @@ export const addBall = async (req: Request, res: Response) => {
       ];
     }
 
-    // 🔹 All-out logic
+    //  All-out logic
     const battingTeamSize = inning.battingTeam.equals(match.teamA)
       ? match.playingTeamA.length
       : match.playingTeamB.length;
@@ -168,13 +168,13 @@ export const addBall = async (req: Request, res: Response) => {
       inning.resultType = "all-out";
     }
 
-    // 🔹 Over finish
+    //  Over finish
     if (inning.oversCompleted === match.totalOverInMatch) {
       inning.status = "completed";
       inning.resultType = "overs-completed";
     }
 
-    // 🔹 Chase logic
+    //  Chase logic
     if (inning.inningNumber === 2) {
       if (inning.totalRuns >= (inning.target || 0)) {
         inning.status = "completed";
@@ -188,10 +188,10 @@ export const addBall = async (req: Request, res: Response) => {
       }
     }
 
-    // 🔹 Save inning + match parallel
+    //  Save inning + match parallel
     await Promise.all([inning.save(), match.save()]);
 
-    // 🔥 Emit score instantly (FAST RESPONSE)
+    //  Emit score instantly (FAST RESPONSE)
     io.emit("scoreUpdate", {
       inningId: inning._id,
       score: {
@@ -202,15 +202,15 @@ export const addBall = async (req: Request, res: Response) => {
       commentary: null,
     });
 
-    // 🚀 Send response immediately
+    // Send response immediately
     res.status(201).json({
       message: "Ball added",
       inning,
       commentary: null,
     });
 
-    // ===============================
-    // 🔥 BACKGROUND AI COMMENTARY
+    // ==============================
+    //  BACKGROUND AI COMMENTARY
     // ===============================
     setImmediate(async () => {
       try {

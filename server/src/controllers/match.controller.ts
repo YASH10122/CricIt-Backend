@@ -280,27 +280,39 @@ export const getAllMatch = async (req: Request, res: Response) => {
 export const matchDetail = async (req: Request, res: Response) => {
   try {
     const { matchId } = req.params;
- 
-    const match = await Match.findById(matchId)
-      .populate("teamA", "teamname")
-      .populate("teamB", "teamname")
-      .populate("tossWinner", "teamname")
-      .populate("winner", "teamname")
-      .populate("playingTeamA", "playername")
-      .populate("playingTeamB", "playername");
- 
+
+    // 🚀 Run in parallel
+    const [match, innings] = await Promise.all([
+      Match.findById(matchId)
+        .select(
+          "teamA teamB tossWinner winner playingTeamA playingTeamB status totalOverInMatch"
+        )
+        .populate("teamA", "teamname")
+        .populate("teamB", "teamname")
+        .populate("tossWinner", "teamname")
+        .populate("winner", "teamname")
+        .lean(),
+
+      Inning.find({ matchId })
+        .select(
+          "battingTeam bowlingTeam totalRuns totalWickets oversCompleted ballsInCurrentOver striker nonStriker currentBowler status inningNumber target"
+        )
+        .populate("battingTeam", "teamname")
+        .populate("bowlingTeam", "teamname")
+        .populate("striker", "playername")
+        .populate("nonStriker", "playername")
+        .populate("currentBowler", "playername")
+        .lean(),
+    ]);
+
     if (!match) {
       return res.status(404).json({ message: "Match not found" });
     }
- 
-    const innings = await Inning.find({ matchId })
-      .populate("battingTeam", "teamname")
-      .populate("bowlingTeam", "teamname")
-      .populate("striker", "playername")
-      .populate("nonStriker", "playername")
-      .populate("currentBowler", "playername");
- 
-    res.status(200).json({ ...match.toObject(), innings });
+
+    res.status(200).json({
+      ...match,
+      innings,
+    });
   } catch (error) {
     console.log("MATCH DETAIL ERROR:", error);
     res.status(500).json({ message: "Server error", error });
@@ -311,8 +323,10 @@ export const matchDetail = async (req: Request, res: Response) => {
 export const getLiveMatches = async (req: Request, res: Response) => {
   try {
     const matches = await Match.find({ status: "live" })
+      .select("teamA teamB status")
       .populate("teamA", "teamname")
-      .populate("teamB", "teamname");
+      .populate("teamB", "teamname")
+      .lean();
 
     res.status(200).json(matches);
   } catch (error) {
