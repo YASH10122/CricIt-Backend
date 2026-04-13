@@ -242,37 +242,54 @@ export const EndMatch = async (req: Request, res: Response) => {
 
 export const getAllMatch = async (req: Request, res: Response) => {
   try {
+    //  Fetch matches (optimized)
     const matches = await Match.find()
+      .select(
+        "teamA teamB tossWinner winner status createdAt totalOverInMatch"
+      )
       .populate("teamA", "teamname")
       .populate("teamB", "teamname")
       .populate("tossWinner", "teamname")
       .populate("winner", "teamname")
-      .populate("playingTeamA", "playername")
-      .populate("playingTeamB", "playername")
-      .sort({ createdAt: -1 });
- 
-    if (!matches) {
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!matches.length) {
       return res.status(404).json({ message: "No matches found" });
     }
- 
+
     const matchIds = matches.map((m) => m._id);
- 
-    //for n the card 
+
+    //  Fetch innings (optimized)
     const innings = await Inning.find({ matchId: { $in: matchIds } })
       .select(
         "matchId inningNumber battingTeam totalRuns totalWickets oversCompleted ballsInCurrentOver status target"
       )
-      .populate("battingTeam", "teamname");
- 
+      .populate("battingTeam", "teamname")
+      .lean();
+
+    //  Convert innings into Map (O(N))
+    const inningsMap = new Map();
+
+    innings.forEach((inn) => {
+      const key = inn.matchId.toString();
+
+      if (!inningsMap.has(key)) {
+        inningsMap.set(key, []);
+      }
+
+      inningsMap.get(key).push(inn);
+    });
+
+    //  Attach innings to matches (FAST)
     const matchesWithInnings = matches.map((match) => ({
-      ...match.toObject(),
-      innings: innings.filter(
-        (inn) => inn.matchId.toString() === match._id.toString()
-      ),
+      ...match,
+      innings: inningsMap.get(match._id.toString()) || [],
     }));
- 
+
     res.status(200).json(matchesWithInnings);
   } catch (error) {
+    console.error("GET ALL MATCH ERROR:", error);
     res.status(500).json({ message: "Server error", error });
   }
 };
