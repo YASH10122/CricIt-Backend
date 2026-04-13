@@ -10,6 +10,7 @@ import matchRoutes from './routes/match.routes';
 import inningRoutes from './routes/inning.routes';
 import ballRoutes from './routes/ball.routes';
 import adminRoutes from './routes/admin.routes';
+import aiRoutes from './routes/ai.routes';
 
 const app = express();
 app.use(express.json());
@@ -28,9 +29,6 @@ const io = new Server(server, {
 });
 
 
-
-
-
 app.use('/api/users', userRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/player', playerRoutes);
@@ -38,6 +36,7 @@ app.use('/api/match', matchRoutes);
 app.use('/api/inning',inningRoutes);
 app.use('/api/ball', ballRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/ai', aiRoutes);
 
 
 const PORT = process.env.PORT || 7000

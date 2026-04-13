@@ -3,6 +3,8 @@ import Inning from "../model/inning.model";
 import Ball from "../model/ball.model";
 import { Request, Response } from "express";
 import PlayerHistory from "../model/playerHistory.model";
+import Player from "../model/players.model";
+import { ExtraType, WicketType, generateAiCommentaryText } from "./ai.controller";
 
 import { io } from "../server";
 
@@ -185,13 +187,44 @@ if (isLegalDelivery && inning.ballsInCurrentOver === 6) {
     await inning.save();
     await match.save();
 
+    let aiCommentary: string | null = null;
+    try {
+      const [batsmanDoc, bowlerDoc] = await Promise.all([
+        Player.findById(ball.batsman).select("playername"),
+        Player.findById(ball.bowler).select("playername"),
+      ]);
+
+      aiCommentary = await generateAiCommentaryText({
+        batsman: batsmanDoc?.playername || "Batsman",
+        bowler: bowlerDoc?.playername || "Bowler",
+        runsScored: ball.runsScored,
+        extraType: (ball.extraType ?? null) as ExtraType,
+        isWicket: ball.isWicket,
+        wicketType: ball.wicketType as WicketType | undefined,
+        overNumber: ball.overNumber,
+        ballNumber: ball.ballNumber + 1,
+      });
+      ball.commentaryText = aiCommentary;
+      await ball.save();
+    } catch (commentaryError) {
+      console.error("AI commentary generation failed:", commentaryError);
+    }
 
 
-io.emit("scoreUpdate")
+io.emit("scoreUpdate", {
+  inningId: inning._id,
+  score: {
+    runs: inning.totalRuns,
+    wickets: inning.totalWickets,
+    overs: `${inning.oversCompleted}.${inning.ballsInCurrentOver}`,
+  },
+  commentary: aiCommentary,
+});
 
     res.status(201).json({
       message: "Ball added",
       inning,
+      commentary: aiCommentary,
     });
   } catch (error) {
     res.status(500).json({ message: "Server error", error });
@@ -258,6 +291,8 @@ export const getCommentary = async (req: Request, res: Response) => {
     .populate("batsman bowler");
 
   const commentary = balls.map((b) => {
+    if (b.commentaryText) return b.commentaryText;
+
     let result = "";
 
     if (b.isWicket) result = "WICKET";
@@ -291,186 +326,3 @@ export const changeBowler = async (req: Request, res: Response) => {
   }
 };
 
-// import Match, { MatchStatus } from "../model/match.model";
-// import Inning from "../model/inning.model";
-// import Ball from "../model/ball.model";
-// import { Request, Response } from "express";
-
-// export const addBall = async (req: Request, res: Response) => {
-//   try {
-//     const { matchId, Id } = req.params;
-//     const {
-//       runsScored = 0,
-//       extraRuns = 0,
-//       isWicket = false,
-//       extraType,
-//       wicketType,
-//       outPlayer,
-//       batsman,
-//       bowler,
-//     } = req.body;
-
-//     const match = await Match.findById(matchId);
-//     if (!match) return res.status(404).json({ message: "Match not found..." });
-//     if (match.status !== MatchStatus.LIVE)
-//       return res.status(400).json({ message: "Match is not live!!!!!!!!!!!!" });
-
-//     const inning = await Inning.findById(Id);
-//     if (!inning)
-//       return res.status(404).json({ message: "inning not found...." });
-//     if (inning.status == "completed")
-//       return res.status(400).json({ message: "match is compleated...." });
-
-//     const overNumber = inning.oversCompleted;
-//     const ballNumber = inning.ballsInCurrentOver;
-
-//     const ball = await new Ball({
-//       matchId,
-//       inningsId: Id,
-//       batsman: batsman || inning.striker,
-//       bowler: bowler || inning.currentBowler,
-//       runsScored,
-//       extraType,
-//       wicketType,
-//       overNumber,
-//       ballNumber,
-//     });
-
-//     inning.totalRuns += runsScored + extraRuns;
-
-//     const isLegalDelivery =
-//       !extraType || (extraType !== "wide" && extraType !== "no-ball");
-
-//     if (isLegalDelivery) {
-//       inning.ballsInCurrentOver++;
-
-//       if (inning.ballsInCurrentOver === 6) {
-//         inning.oversCompleted++;
-//         inning.ballsInCurrentOver = 0;
-//       }
-//     }
-
-//     if (isWicket) {
-//       inning.totalWickets++;
-//     }
-
-//     if (inning.totalWickets === 10) {
-//       inning.status = "completed";
-//       inning.resultType = "all-out";
-//     }
-
-//     if (runsScored % 2 !== 0) {
-//       [inning.striker, inning.nonStriker] = [inning.nonStriker, inning.striker];
-//     }
-
-//     if (isLegalDelivery && inning.ballsInCurrentOver === 0) {
-//       [inning.striker, inning.nonStriker] = [inning.nonStriker, inning.striker];
-//     }
-
-//     await inning.save();
-
-//     res.status(201).json({ message: "Ball added successfully", ball, inning });
-//   } catch (error) {
-//     res.status(400).json({ message: "server error", error });
-//   }
-// };
-
-// export const getBallsByOver = async (req: Request, res: Response) => {
-//   try {
-//     const { inningsId } = req.params;
-
-//     const balls = await Ball.find({ inningsId })
-//       .sort({ overNumber: 1, ballNumber: 1 })
-//       .populate("batsman bowler");
-
-//     res.status(200).json({ balls });
-//   } catch (error) {
-//     res.status(500).json({ message: "Error fetching balls", error });
-//   }
-// };
-
-// export const getCurrentScore = async (req: Request, res: Response) => {
-//   try {
-//     const { id } = req.params;
-
-//     const inning = await Inning.findById(id);
-//     if (!inning) return res.status(404).json({ message: "Innings not found" });
-
-//     const overs = `${inning.oversCompleted}.${inning.ballsInCurrentOver}`;
-
-//     res.status(200).json({
-//       runs: inning.totalRuns,
-//       wickets: inning.totalWickets,
-//       overs,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: "Error fetching score", error });
-//   }
-// };
-
-// export const undoLastBall = async (req: Request, res: Response) => {
-//   try {
-//     const { inningsId } = req.params;
-
-//     const lastBall = await Ball.findOne({ inningsId }).sort({ createdAt: -1 });
-//     if (!lastBall) return res.status(404).json({ message: "No ball to undo" });
-
-//     const inning = await Inning.findById(inningsId);
-//     if (!inning) return res.status(404).json({ message: "Innings not found" });
-
-//     // Reverse score impact
-//     inning.totalRuns -= lastBall.runsScored + (lastBall.extraType ? 1 : 0);
-
-//     if (lastBall.wicketType) {
-//       inning.totalWickets--;
-//     }
-
-//     const wasLegal =
-//       !lastBall.extraType ||
-//       (lastBall.extraType !== "wide" && lastBall.extraType !== "no-ball");
-//     if (wasLegal) {
-//       if (inning.ballsInCurrentOver === 0) {
-//         inning.oversCompleted--;
-//         inning.ballsInCurrentOver = 5;
-//       } else {
-//         inning.ballsInCurrentOver--;
-//       }
-//     }
-
-//     await inning.save();
-//     await Ball.findByIdAndDelete(lastBall._id);
-
-//     res.status(200).json({ message: "Ball undone successfully", inning });
-//   } catch (error) {
-//     res.status(500).json({ message: "Error undoing ball", error });
-//   }
-// };
-
-// export const getCommentary = async (req: Request, res: Response) => {
-//   try {
-//     const { inningsId } = req.params;
-
-//     const balls = await Ball.find({ inningsId })
-//       .sort({ overNumber: -1, ballNumber: -1 })
-//       .populate("batsman bowler");
-
-//     const commentary = balls.map((ball) => {
-//       const over = `${ball.overNumber}.${ball.ballNumber}`;
-//       const batsman = (ball.batsman as any)?.name || "Unknown";
-//       const bowler = (ball.bowler as any)?.name || "Unknown";
-//       let result = "";
-
-//       if (ball.wicketType) result = "WICKET";
-//       else if (ball.runsScored === 6) result = "SIX";
-//       else if (ball.runsScored === 4) result = "FOUR";
-//       else if (ball.extraType) result = ball.extraType.toUpperCase();
-//       else result = `${ball.runsScored} run${ball.runsScored !== 1 ? "s" : ""}`;
-
-//       return `Over ${over} - ${bowler} to ${batsman} - ${result}`;
-//     });
-
-//     res.status(200).json({ commentary });
-//   } catch (error) {
-//     res.status(500).json({ message: "Error fetching commentary", error });
-//   }
-// };

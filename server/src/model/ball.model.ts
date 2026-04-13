@@ -30,6 +30,7 @@ export interface IBall extends Document {
     | "hit-wicket"
     | "retired-out";
   outPlayer?: Types.ObjectId;
+  commentaryText?: string;
 
   
   createdAt: Date;
@@ -119,6 +120,10 @@ const BallSchema = new Schema<IBall>(
     outPlayer: {
       type: Schema.Types.ObjectId,
       ref: "Player",
+    },
+    commentaryText: {
+      type: String,
+      default: null,
     },
   },
   {
