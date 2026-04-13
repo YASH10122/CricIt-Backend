@@ -24,23 +24,28 @@ export const addBall = async (req: Request, res: Response) => {
       bowler,
     } = req.body;
 
-    const match = await Match.findById(matchId);
+    // 🔹 Fetch match & inning in parallel
+    const [match, inning] = await Promise.all([
+      Match.findById(matchId),
+      Inning.findById(inningId),
+    ]);
+
     if (!match) return res.status(404).json({ message: "Match not found" });
-
-    if (match.status !== MatchStatus.LIVE)
-      return res.status(400).json({ message: "Match not live" });
-
-    const inning = await Inning.findById(inningId);
     if (!inning) return res.status(404).json({ message: "Inning not found" });
 
-    if (inning.status === "completed")
-      return res.status(400).json({ message: "Inning already completed" });
+    if (match.status !== MatchStatus.LIVE) {
+      return res.status(400).json({ message: "Match not live" });
+    }
 
-    //  legal delivery
+    if (inning.status === "completed") {
+      return res.status(400).json({ message: "Inning already completed" });
+    }
+
+    // 🔹 Check legal delivery
     const isLegalDelivery =
       !extraType || (extraType !== "wide" && extraType !== "no-ball");
 
-    //  ball
+    // 🔹 Create Ball
     const ball = await Ball.create({
       matchId,
       inningsId: inningId,
@@ -57,59 +62,66 @@ export const addBall = async (req: Request, res: Response) => {
       outPlayer,
     });
 
-    // 🟢 BATSMAN UPDATE
-await PlayerHistory.findOneAndUpdate(
-  { playerId: inning.striker, matchId },
-  {
-    $inc: {
-      battingRuns: runsScored,
-      battingBalls: isLegalDelivery ? 1 : 0,
-      fours: runsScored === 4 ? 1 : 0,
-      sixes: runsScored === 6 ? 1 : 0,
-    },
-  },
-   { upsert: true, new: true }
-);
+    const currentBowler = bowler || inning.currentBowler;
 
-// 🔵 BOWLER UPDATE
-await PlayerHistory.findOneAndUpdate(
-  { playerId: bowler || inning.currentBowler, matchId },
-  {
-    $inc: {
-      runsConceded: runsScored + extraRuns,
-      bowlingBalls: isLegalDelivery ? 1 : 0,
-      wickets: isWicket ? 1 : 0,
-    },
-  },
-   { upsert: true, new: true }
-);
+    // 🔥 Parallel PlayerHistory updates
+    const updates = [
+      // 🟢 Batsman
+      PlayerHistory.findOneAndUpdate(
+        { playerId: inning.striker, matchId },
+        {
+          $inc: {
+            battingRuns: runsScored,
+            battingBalls: isLegalDelivery ? 1 : 0,
+            fours: runsScored === 4 ? 1 : 0,
+            sixes: runsScored === 6 ? 1 : 0,
+          },
+        },
+        { upsert: true }
+      ),
 
-// 🔴 WICKET UPDATE (BATSMAN OUT)
-if (isWicket && outPlayer) {
-  await PlayerHistory.findOneAndUpdate(
-    { playerId: outPlayer, matchId },
-    {
-      isOut: true,
-      outType: wicketType,
+      // 🔵 Bowler
+      PlayerHistory.findOneAndUpdate(
+        { playerId: currentBowler, matchId },
+        {
+          $inc: {
+            runsConceded: runsScored + extraRuns,
+            bowlingBalls: isLegalDelivery ? 1 : 0,
+            wickets: isWicket ? 1 : 0,
+          },
+        },
+        { upsert: true }
+      ),
+    ];
+
+    // 🔴 Wicket update
+    if (isWicket && outPlayer) {
+      updates.push(
+        PlayerHistory.findOneAndUpdate(
+          { playerId: outPlayer, matchId },
+          {
+            isOut: true,
+            outType: wicketType,
+          }
+        )
+      );
     }
-  );
-}
 
-// 🟡 OVER UPDATE
-if (isLegalDelivery && inning.ballsInCurrentOver === 6) {
-  await PlayerHistory.findOneAndUpdate(
-    { playerId: bowler || inning.currentBowler, matchId },
-    {
-      $inc: { bowlingOvers: 1 },
+    // 🟡 Over complete update
+    if (isLegalDelivery && inning.ballsInCurrentOver === 5) {
+      updates.push(
+        PlayerHistory.findOneAndUpdate(
+          { playerId: currentBowler, matchId },
+          { $inc: { bowlingOvers: 1 } }
+        )
+      );
     }
-  );
-}
 
-   
-    //  runs
+    await Promise.all(updates);
+
+    // 🔹 Update inning stats
     inning.totalRuns += runsScored + extraRuns;
 
-    //  wicket
     if (isWicket) {
       inning.totalWickets++;
 
@@ -122,7 +134,7 @@ if (isLegalDelivery && inning.ballsInCurrentOver === 6) {
       }
     }
 
-    // ball count
+    // 🔹 Ball count
     if (isLegalDelivery) {
       inning.ballsInCurrentOver++;
 
@@ -130,26 +142,23 @@ if (isLegalDelivery && inning.ballsInCurrentOver === 6) {
         inning.oversCompleted++;
         inning.ballsInCurrentOver = 0;
 
-        // Over end strike change
-        const temp = inning.striker;
-        inning.striker = inning.nonStriker;
-        inning.nonStriker = temp;
+        // strike change
+        [inning.striker, inning.nonStriker] = [
+          inning.nonStriker,
+          inning.striker,
+        ];
       }
     }
 
-    // strike Rotate
+    // 🔹 Strike rotate
     if (runsScored % 2 === 1) {
-      const temp = inning.striker;
-      inning.striker = inning.nonStriker;
-      inning.nonStriker = temp;
+      [inning.striker, inning.nonStriker] = [
+        inning.nonStriker,
+        inning.striker,
+      ];
     }
 
-    //all Out
-    // if (inning.totalWickets === match.playingTeamA.length) {
-    //   inning.status = "completed";
-    //   inning.resultType = "all-out";
-    // }
-
+    // 🔹 All-out logic
     const battingTeamSize = inning.battingTeam.equals(match.teamA)
       ? match.playingTeamA.length
       : match.playingTeamB.length;
@@ -159,73 +168,76 @@ if (isLegalDelivery && inning.ballsInCurrentOver === 6) {
       inning.resultType = "all-out";
     }
 
-    // Over finish
+    // 🔹 Over finish
     if (inning.oversCompleted === match.totalOverInMatch) {
       inning.status = "completed";
       inning.resultType = "overs-completed";
     }
 
-    // target chase
-    // if (inning.inningNumber === 2 && inning.totalRuns >= (inning.target || 0)) {
-    //   inning.status = "completed";
-    //   inning.resultType = "chased";
-    //   match.status = MatchStatus.FINISHED;
-    // }
-
+    // 🔹 Chase logic
     if (inning.inningNumber === 2) {
       if (inning.totalRuns >= (inning.target || 0)) {
         inning.status = "completed";
 
-        await inning.save();
-
-        await Match.findByIdAndUpdate(inning.matchId, {
-          status: "completed",
-        });
+        await Promise.all([
+          inning.save(),
+          Match.findByIdAndUpdate(inning.matchId, {
+            status: "completed",
+          }),
+        ]);
       }
     }
 
-    await inning.save();
-    await match.save();
+    // 🔹 Save inning + match parallel
+    await Promise.all([inning.save(), match.save()]);
 
-    let aiCommentary: string | null = null;
-    try {
-      const [batsmanDoc, bowlerDoc] = await Promise.all([
-        Player.findById(ball.batsman).select("playername"),
-        Player.findById(ball.bowler).select("playername"),
-      ]);
+    // 🔥 Emit score instantly (FAST RESPONSE)
+    io.emit("scoreUpdate", {
+      inningId: inning._id,
+      score: {
+        runs: inning.totalRuns,
+        wickets: inning.totalWickets,
+        overs: `${inning.oversCompleted}.${inning.ballsInCurrentOver}`,
+      },
+      commentary: null,
+    });
 
-      aiCommentary = await generateAiCommentaryText({
-        batsman: batsmanDoc?.playername || "Batsman",
-        bowler: bowlerDoc?.playername || "Bowler",
-        runsScored: ball.runsScored,
-        extraType: (ball.extraType ?? null) as ExtraType,
-        isWicket: ball.isWicket,
-        wicketType: ball.wicketType as WicketType | undefined,
-        overNumber: ball.overNumber,
-        ballNumber: ball.ballNumber + 1,
-      });
-      ball.commentaryText = aiCommentary;
-      await ball.save();
-    } catch (commentaryError) {
-      console.error("AI commentary generation failed:", commentaryError);
-    }
-
-
-io.emit("scoreUpdate", {
-  inningId: inning._id,
-  score: {
-    runs: inning.totalRuns,
-    wickets: inning.totalWickets,
-    overs: `${inning.oversCompleted}.${inning.ballsInCurrentOver}`,
-  },
-  commentary: aiCommentary,
-});
-
+    // 🚀 Send response immediately
     res.status(201).json({
       message: "Ball added",
       inning,
-      commentary: aiCommentary,
+      commentary: null,
     });
+
+    // ===============================
+    // 🔥 BACKGROUND AI COMMENTARY
+    // ===============================
+    setImmediate(async () => {
+      try {
+        const aiText = await generateAiCommentaryText({
+          batsman: "Batsman",
+          bowler: "Bowler",
+          runsScored,
+          extraType,
+          isWicket,
+          wicketType,
+          overNumber: ball.overNumber,
+          ballNumber: ball.ballNumber + 1,
+        });
+
+        await Ball.findByIdAndUpdate(ball._id, {
+          commentaryText: aiText,
+        });
+
+        io.emit("commentaryUpdate", {
+          inningId: inning._id,
+          commentary: aiText,
+        });
+      } catch (err) {
+        console.error("AI commentary error:", err);
+      }
+    });
+
   } catch (error) {
     res.status(500).json({ message: "Server error", error });
   }
