@@ -242,7 +242,9 @@ export const EndMatch = async (req: Request, res: Response) => {
 
 export const getAllMatch = async (req: Request, res: Response) => {
   try {
-    //  Fetch matches (optimized)
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = parseInt(req.query.offset as string) || 0;
+
     const matches = await Match.find()
       .select(
         "teamA teamB tossWinner winner status createdAt totalOverInMatch matchType"
@@ -252,6 +254,8 @@ export const getAllMatch = async (req: Request, res: Response) => {
       .populate("tossWinner", "teamname")
       .populate("winner", "teamname")
       .sort({ createdAt: -1 })
+      .skip(offset)
+      .limit(limit)
       .lean();
 
     if (!matches.length) {

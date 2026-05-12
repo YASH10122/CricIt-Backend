@@ -169,23 +169,25 @@ export const generateAiCommentary = async (req: Request, res: Response) => {
 
     const prompt = `
 You are a professional cricket commentator.
-Create exactly one short commentary sentence for the delivery.
+Create exactly one simple and realistic commentary sentence for this delivery.
+
 Rules:
-- Max 20 words
 - If runs are 4 or 6, tone must be exciting
-- If wicket fell, tone must be dramatic
+- If wicket fell, tone must be dramatic  
 - If dot ball, tone must be calm
 - Return only one sentence, no extra text
+- NEVER mention the over number or over count in the text.
+- Use simple, direct language.
+- Max 15 words.
+- Tone: ${tone}.
 
 Delivery:
-- Over: ${body.overNumber}.${body.ballNumber}
 - Bowler: ${body.bowler}
 - Batsman: ${body.batsman}
 - Runs: ${body.runsScored}
-- Extra type: ${body.extraType ?? "none"}
+- Extra: ${body.extraType ?? "none"}
 - Wicket: ${body.isWicket ? "yes" : "no"}
 - Wicket type: ${body.wicketType ?? "none"}
-- Required tone: ${tone}
 `.trim();
 
     const commentary = await generateAiCommentaryText(body, prompt);
@@ -341,23 +343,21 @@ const generateAiCommentaryText = async (
     preparedPrompt ||
     `
 You are a professional cricket commentator.
-Create exactly one short commentary sentence for the delivery.
+Create exactly one simple and realistic commentary sentence for this delivery.
+
 Rules:
-- Max 20 words
-- If runs are 4 or 6, tone must be exciting
-- If wicket fell, tone must be dramatic
-- If dot ball, tone must be calm
-- Return only one sentence, no extra text
+- NEVER mention the over number or over count in the text.
+- Use simple, direct language.
+- Max 15 words.
+- Tone: ${tone}.
 
 Delivery:
-- Over: ${body.overNumber}.${body.ballNumber}
 - Bowler: ${body.bowler}
 - Batsman: ${body.batsman}
 - Runs: ${body.runsScored}
-- Extra type: ${body.extraType ?? "none"}
+- Extra: ${body.extraType ?? "none"}
 - Wicket: ${body.isWicket ? "yes" : "no"}
 - Wicket type: ${body.wicketType ?? "none"}
-- Required tone: ${tone}
 `.trim();
 
   const client = groq || getGroqClient();

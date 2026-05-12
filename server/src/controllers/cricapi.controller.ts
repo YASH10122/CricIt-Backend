@@ -82,8 +82,19 @@ const getCachedKeyEntries = () => {
 const readOffset = (req: Request) =>
   typeof req.query.offset === "string" ? req.query.offset : "0";
 
+let matchesCache: Map<string, { data: any; timestamp: number }> = new Map();
+const CACHE_TTL = 5 * 60 * 1000;
+
 export const getCricMatches = async (req: Request, res: Response) => {
   try {
+    const offset = readOffset(req);
+
+    // Check Cache
+    const cached = matchesCache.get(offset);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return res.status(200).json(cached.data);
+    }
+
     const keyEntries = getCachedKeyEntries();
 
     if (keyEntries.length === 0) {
@@ -92,7 +103,6 @@ export const getCricMatches = async (req: Request, res: Response) => {
         .json({ message: "CricAPI keys are not configured on the server" });
     }
 
-    const offset = readOffset(req);
     let lastFailure: { status: number; data: unknown } | null = null;
     const attempts: Array<{ key: string; status: number; reason?: string }> = [];
 
@@ -128,6 +138,7 @@ export const getCricMatches = async (req: Request, res: Response) => {
 
         if (!isFailure) {
           res.setHeader("x-cricapi-key-used", key.name);
+          matchesCache.set(offset, { data, timestamp: Date.now() });
           return res.status(200).json(data);
         }
 
