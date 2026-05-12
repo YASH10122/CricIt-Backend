@@ -225,13 +225,17 @@ export const addBall = async (req: Request, res: Response) => {
           ballNumber: ball.ballNumber + 1,
         });
 
+        const formattedAiText = `Over ${ball.overNumber}.${ball.ballNumber + 1} - ${aiText}`;
+
         await Ball.findByIdAndUpdate(ball._id, {
-          commentaryText: aiText,
+          commentaryText: formattedAiText,
         });
 
         io.emit("commentaryUpdate", {
           inningId: inning._id,
-          commentary: aiText,
+          commentary: formattedAiText,
+          score: `${inning.totalRuns}/${inning.totalWickets}`,
+          overs: `${inning.oversCompleted}.${inning.ballsInCurrentOver}`
         });
       } catch (err) {
         console.error("AI commentary error:", err);
@@ -298,25 +302,41 @@ export const getBallsByOver = async (req: Request, res: Response) => {
 };
 
 export const getCommentary = async (req: Request, res: Response) => {
-  const balls = await Ball.find({ inningsId: req.params.inningId })
-    .sort({ createdAt: -1 })
-    .populate("batsman bowler");
+  try {
+    const balls = await Ball.find({ inningsId: req.params.inningId })
+      .sort({ createdAt: 1 }) // Chronological order to calculate cumulative score
+      .populate("batsman bowler");
 
-  const commentary = balls.map((b) => {
-    if (b.commentaryText) return b.commentaryText;
+    let currentRuns = 0;
+    let currentWickets = 0;
 
-    let result = "";
+    const commentary = balls.map((b) => {
+      let text = b.commentaryText || "";
+      
+      if (!text) {
+        let result = "";
+        if (b.isWicket) result = "WICKET";
+        else if (b.runsScored === 4) result = "FOUR";
+        else if (b.runsScored === 6) result = "SIX";
+        else if (b.extraType) result = b.extraType.toUpperCase();
+        else result = `${b.runsScored} run${b.runsScored !== 1 ? "s" : ""}`;
+        text = `Over ${b.overNumber}.${b.ballNumber + 1} - ${result}`;
+      } else if (!text.startsWith("Over ")) {
+        // Ensure prefix is there for replacement logic
+        text = `Over ${b.overNumber}.${b.ballNumber + 1} - ${text}`;
+      }
 
-    if (b.isWicket) result = "WICKET";
-    else if (b.runsScored === 4) result = "FOUR";
-    else if (b.runsScored === 6) result = "SIX";
-    else if (b.extraType) result = b.extraType;
-    else result = `${b.runsScored} run`;
+      currentRuns += b.runsScored + (b.extraRuns || 0);
+      if (b.isWicket) currentWickets++;
 
-    return `Over ${b.overNumber}.${b.ballNumber + 1} - ${result}`;
-  });
+      const scoreStr = `(Score: ${currentRuns}/${currentWickets})`;
+      return `${text} ${scoreStr}`;
+    });
 
-  res.json(commentary);
+    res.json(commentary.reverse());
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching commentary", error });
+  }
 };
 
 export const changeBowler = async (req: Request, res: Response) => {

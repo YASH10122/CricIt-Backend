@@ -245,7 +245,7 @@ export const getAllMatch = async (req: Request, res: Response) => {
     //  Fetch matches (optimized)
     const matches = await Match.find()
       .select(
-        "teamA teamB tossWinner winner status createdAt totalOverInMatch"
+        "teamA teamB tossWinner winner status createdAt totalOverInMatch matchType"
       )
       .populate("teamA", "teamname")
       .populate("teamB", "teamname")
@@ -302,7 +302,7 @@ export const matchDetail = async (req: Request, res: Response) => {
     const [match, innings] = await Promise.all([
       Match.findById(matchId)
         .select(
-          "teamA teamB tossWinner tossDecision winner playingTeamA playingTeamB status totalOverInMatch"
+          "teamA teamB tossWinner tossDecision winner playingTeamA playingTeamB status totalOverInMatch matchType"
         )
         .populate("teamA", "teamname")
         .populate("teamB", "teamname")
