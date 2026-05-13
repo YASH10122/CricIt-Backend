@@ -240,12 +240,27 @@ export const EndMatch = async (req: Request, res: Response) => {
 
 
 
+let allMatchesCache: Map<string, { data: any; timestamp: number }> = new Map();
+const ALL_MATCHES_CACHE_TTL = 30 * 1000; // 30 seconds
+
 export const getAllMatch = async (req: Request, res: Response) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 10;
+    const limit = parseInt(req.query.limit as string) || 12;
     const offset = parseInt(req.query.offset as string) || 0;
+    const status = req.query.status as string;
 
-    const matches = await Match.find()
+    const cacheKey = `${limit}-${offset}-${status || "all"}`;
+    const cached = allMatchesCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < ALL_MATCHES_CACHE_TTL) {
+      return res.status(200).json(cached.data);
+    }
+
+    const query: any = {};
+    if (status && status !== "all") {
+      query.status = status;
+    }
+
+    const matches = await Match.find(query)
       .select(
         "teamA teamB tossWinner winner status createdAt totalOverInMatch matchType"
       )
@@ -290,6 +305,13 @@ export const getAllMatch = async (req: Request, res: Response) => {
       ...match,
       innings: inningsMap.get(match._id.toString()) || [],
     }));
+
+    // Save to cache
+    const limit = parseInt(req.query.limit as string) || 12;
+    const offset = parseInt(req.query.offset as string) || 0;
+    const status = req.query.status as string;
+    const cacheKey = `${limit}-${offset}-${status || "all"}`;
+    allMatchesCache.set(cacheKey, { data: matchesWithInnings, timestamp: Date.now() });
 
     res.status(200).json(matchesWithInnings);
   } catch (error) {

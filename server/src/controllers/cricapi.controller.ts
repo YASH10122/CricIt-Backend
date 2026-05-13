@@ -83,7 +83,7 @@ const readOffset = (req: Request) =>
   typeof req.query.offset === "string" ? req.query.offset : "0";
 
 let matchesCache: Map<string, { data: any; timestamp: number }> = new Map();
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 10 * 60 * 1000;
 
 export const getCricMatches = async (req: Request, res: Response) => {
   try {
@@ -253,6 +253,87 @@ export const getCricMatchInfo = async (req: Request, res: Response) => {
       );
   } catch (e) {
     console.error("cricapi proxy error:", e);
+    return res.status(502).json({ message: "Failed to reach CricAPI" });
+  }
+};
+
+export const getCricMatchScorecard = async (req: Request, res: Response) => {
+  try {
+    const keyEntries = getCachedKeyEntries();
+
+    if (keyEntries.length === 0) {
+      return res
+        .status(500)
+        .json({ message: "CricAPI keys are not configured on the server" });
+    }
+
+    const id = typeof req.query.id === "string" ? req.query.id : "";
+    if (!id) {
+      return res.status(400).json({ message: "Match ID is required" });
+    }
+
+    let lastFailure: { status: number; data: unknown } | null = null;
+    const attempts: Array<{ key: string; status: number; reason?: string }> = [];
+
+    for (const [index, key] of keyEntries.entries()) {
+      try {
+        const url = `${CRICAPI_BASE}/match_scorecard?apikey=${encodeURIComponent(
+          key.value
+        )}&id=${encodeURIComponent(id)}`;
+
+        const upstream = await fetch(url);
+        const raw = await upstream.text();
+        let data: {
+          status?: string;
+          reason?: string;
+          message?: string;
+        } | null = null;
+
+        try {
+          data = raw ? (JSON.parse(raw) as typeof data) : null;
+        } catch {
+          data = { message: raw };
+        }
+
+        const isFailure =
+          !upstream.ok ||
+          data?.status === "failure" ||
+          Boolean(data?.reason);
+
+        if (!isFailure) {
+          res.setHeader("x-cricapi-key-used", key.name);
+          return res.status(200).json(data);
+        }
+
+        attempts.push({
+          key: key.name,
+          status: upstream.status || 429,
+          reason: data?.reason || data?.message,
+        });
+        lastFailure = { status: upstream.status || 429, data };
+      } catch (error) {
+        attempts.push({
+          key: key.name,
+          status: 502,
+          reason: String(error),
+        });
+        lastFailure = {
+          status: 502,
+          data: { message: `Key attempt failed: ${String(error)}` },
+        };
+      }
+    }
+
+    return res
+      .status(lastFailure?.status || 429)
+      .json(
+        lastFailure?.data || {
+          message: "All CricAPI keys are exhausted",
+          attempts,
+        }
+      );
+  } catch (e) {
+    console.error("cricapi scorecard proxy error:", e);
     return res.status(502).json({ message: "Failed to reach CricAPI" });
   }
 };
