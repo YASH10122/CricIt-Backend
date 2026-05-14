@@ -168,18 +168,17 @@ export const generateAiCommentary = async (req: Request, res: Response) => {
     const tone = getTone(body.runsScored, body.isWicket);
 
     const prompt = `
-You are a professional cricket commentator.
-Create exactly one simple and realistic commentary sentence for this delivery.
-
 Rules:
-- If runs are 4 or 6, tone must be exciting
-- If wicket fell, tone must be dramatic  
-- If dot ball, tone must be calm
-- Return only one sentence, no extra text
+- If runs are 4 or 6, tone must be exciting.
+- If wicket fell, tone must be dramatic.
+- If dot ball, tone must be calm.
+- Return only one sentence, no extra text.
 - NEVER mention the over number or over count in the text.
 - Use simple, direct language.
 - Max 15 words.
 - Tone: ${tone}.
+- Style: Enthusiastic Indian commentary (style of Ravi Shastri or Harsha Bhogle).
+- Phrases: Use metaphors like "tracer bullet", "straight as a die", "in the gap", "absolute peach", "cracking shot", "into the crowd".
 
 Delivery:
 - Bowler: ${body.bowler}
@@ -342,14 +341,17 @@ const generateAiCommentaryText = async (
   const prompt =
     preparedPrompt ||
     `
-You are a professional cricket commentator.
-Create exactly one simple and realistic commentary sentence for this delivery.
-
 Rules:
+- If runs are 4 or 6, tone must be exciting.
+- If wicket fell, tone must be dramatic.
+- If dot ball, tone must be calm.
+- Return only one sentence, no extra text.
 - NEVER mention the over number or over count in the text.
 - Use simple, direct language.
 - Max 15 words.
 - Tone: ${tone}.
+- Style: Enthusiastic Indian commentary (style of Ravi Shastri or Harsha Bhogle).
+- Phrases: Use metaphors like "tracer bullet", "straight as a die", "in the gap", "absolute peach", "cracking shot", "into the crowd".
 
 Delivery:
 - Bowler: ${body.bowler}
@@ -370,7 +372,7 @@ Delivery:
     messages: [
       {
         role: "system",
-        content: "You generate concise, realistic cricket commentary.",
+        content: "You generate concise, enthusiastic Indian-style cricket commentary using classic metaphors.",
       },
       {
         role: "user",
